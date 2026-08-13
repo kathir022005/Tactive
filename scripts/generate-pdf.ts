@@ -11,9 +11,10 @@ async function generatePDF() {
 
   // ── Header / Title ───────────────────────────────────────────────
   doc.rect(0, 0, 595, 120).fill('#0f172a');
-  doc.fillColor('#38bdf8').fontSize(24).font('Helvetica-Bold').text('EQUIPFLOW QA ASSESSMENT', 40, 30);
-  doc.fillColor('#94a3b8').fontSize(12).font('Helvetica').text('Before & After QA Test Case Report & Database Migration Summary', 40, 60);
-  doc.fillColor('#e2e8f0').fontSize(10).text('Generated: ' + new Date().toISOString().split('T')[0] + '  |  Target DB: MongoDB Atlas', 40, 85);
+  doc.fillColor('#38bdf8').fontSize(24).font('Helvetica-Bold').text('EQUIPFLOW QA ASSESSMENT', 40, 25);
+  doc.fillColor('#94a3b8').fontSize(11).font('Helvetica').text('Before & After QA Test Case Report & Database Migration Summary', 40, 55);
+  doc.fillColor('#22c55e').fontSize(11).font('Helvetica-Bold').text('LIVE APPLICATION HOST: https://tactive.onrender.com/', 40, 75);
+  doc.fillColor('#e2e8f0').fontSize(9).font('Helvetica').text('Generated: ' + new Date().toISOString().split('T')[0] + '  |  DB: MongoDB Atlas Cloud', 40, 95);
 
   doc.moveDown(4);
 
@@ -151,9 +152,10 @@ async function generatePDF() {
   doc.moveDown(1.5);
 
   // Footer signoff
-  doc.rect(40, doc.y, 515, 50).fill('#0f172a');
-  doc.fillColor('#38bdf8').fontSize(11).font('Helvetica-Bold').text('Submission Status: COMPLETE & READY FOR EVALUATION', 55, doc.y - 40);
-  doc.fillColor('#94a3b8').fontSize(9).font('Helvetica').text('GitHub Repository: https://github.com/kathir022005/Tactive', 55, doc.y - 23);
+  doc.rect(40, doc.y, 515, 60).fill('#0f172a');
+  doc.fillColor('#38bdf8').fontSize(11).font('Helvetica-Bold').text('Submission Status: COMPLETE & READY FOR EVALUATION', 55, doc.y - 50);
+  doc.fillColor('#4ade80').fontSize(9).font('Helvetica-Bold').text('Live App Host: https://tactive.onrender.com/', 55, doc.y - 33);
+  doc.fillColor('#94a3b8').fontSize(9).font('Helvetica').text('GitHub Repository: https://github.com/kathir022005/Tactive', 55, doc.y - 18);
 
   doc.end();
 

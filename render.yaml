@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: tactive
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: node dist/server/index.js
+    envVars:
+      - key: MONGO_URI
+        value: mongodb+srv://kathirashok255:Akkathir2005@cluster0.ly7x9.mongodb.net/equipflow?appName=Cluster0
+      - key: JWT_SECRET
+        value: equipflow_super_secret_jwt_key_2024
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000

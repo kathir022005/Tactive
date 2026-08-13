@@ -3,25 +3,30 @@
 
 <div align="center">
 
+![Live Host](https://img.shields.io/badge/Live%20Demo-tactive.onrender.com-22c55e?style=for-the-badge&logo=render)
 ![Build](https://img.shields.io/badge/Build-Passing-34d399?style=for-the-badge&logo=typescript)
 ![Tests](https://img.shields.io/badge/Tests-19%2F19%20Passing-34d399?style=for-the-badge&logo=vitest)
-![Stack](https://img.shields.io/badge/Stack-Node.js%20%2B%20React%20%2B%20SQLite-3b82f6?style=for-the-badge)
-![Coverage](https://img.shields.io/badge/Coverage-Happy%20Path%20%2B%20Edge%20Cases%20%2B%20Security-8b5cf6?style=for-the-badge)
+![Database](https://img.shields.io/badge/Database-MongoDB%20Atlas-green?style=for-the-badge&logo=mongodb)
+
+### 🌐 Live Application Host: [https://tactive.onrender.com/](https://tactive.onrender.com/)
 
 </div>
 
 ---
 
-## 🚀 Quick Start (5 seconds)
+## 🚀 Quick Access
 
+- **Live Host URL:** [https://tactive.onrender.com/](https://tactive.onrender.com/)
+- **GitHub Repository:** [https://github.com/kathir022005/Tactive](https://github.com/kathir022005/Tactive)
+- **PDF Assessment Report:** [`docs/QA_TEST_REPORT_BEFORE_AFTER.pdf`](file:///docs/QA_TEST_REPORT_BEFORE_AFTER.pdf)
+
+### Run Locally:
 ```bash
-git clone <repo-url>
+git clone https://github.com/kathir022005/Tactive.git
 cd Tactive
 npm install
-npm run dev      # Backend on :3000, Frontend on :5173
+npm run dev      # Server on :3000 with MongoDB Atlas connection
 ```
-
-Navigate to **http://localhost:5173**
 
 ---
 
