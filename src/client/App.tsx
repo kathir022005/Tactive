@@ -4,8 +4,11 @@ import { AssetCatalog } from './components/AssetCatalog.js';
 import { BookingModal } from './components/BookingModal.js';
 import { MyReservations } from './components/MyReservations.js';
 import { AdminPanel } from './components/AdminPanel.js';
+import { Login } from './components/Login.js';
+import { Register } from './components/Register.js';
 import { User, Asset, Reservation, Blackout } from './types.js';
 import { LayoutGrid, CalendarCheck, ShieldCheck } from 'lucide-react';
+import './styles/login.css';
 
 export function App() {
   const [users, setUsers]               = useState<User[]>([]);
@@ -16,7 +19,8 @@ export function App() {
   const [blackouts, setBlackouts]       = useState<Blackout[]>([]);
   const [tab, setTab]                   = useState<'CATALOG' | 'MY_RESERVATIONS' | 'ADMIN'>('CATALOG');
   const [bookingAsset, setBookingAsset] = useState<Asset | null>(null);
-  const [appReady, setAppReady]         = useState(false);
+  const [appReady, setAppReady]         = useState(true);
+  const [showRegister, setShowRegister] = useState(false);
 
   /* ── Bootstrap ── */
   useEffect(() => {
@@ -25,20 +29,24 @@ export function App() {
       .then(data => {
         if (data.users?.length) {
           setUsers(data.users);
-          loginAs(data.users[1] || data.users[0]);  // Default: Jane Doe (VIP)
         }
       })
       .catch(console.error);
     fetchAssets();
   }, []);
 
-  const loginAs = async (user: User) => {
-    const pwd = user.role === 'ADMIN' ? 'admin123' : 'user123';
+  const loginAs = async (username: string, pwd?: string) => {
+    // If pwd is not provided, look it up based on standard test accounts for the user switcher
+    if (!pwd) {
+      const u = users.find(x => x.username === username);
+      pwd = u?.role === 'ADMIN' ? 'admin123' : 'user123';
+    }
+    
     try {
       const res  = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user.username, password: pwd })
+        body: JSON.stringify({ username, password: pwd })
       });
       const data = await res.json();
       if (data.token) {
@@ -46,9 +54,13 @@ export function App() {
         setCurrentUser(data.user);
         fetchReservations(data.token);
         if (data.user.role === 'ADMIN') fetchBlackouts(data.token);
-        setAppReady(true);
+        return { success: true };
+      } else {
+        return { success: false, error: data.error };
       }
-    } catch (e) { console.error(e); }
+    } catch (e: any) { 
+      return { success: false, error: 'Network error occurred' };
+    }
   };
 
   const fetchAssets = () =>
@@ -75,7 +87,7 @@ export function App() {
 
   const handleSwitchUser = (userId: number) => {
     const u = users.find(x => x.id === userId);
-    if (u) { setReservations([]); loginAs(u); }
+    if (u) { setReservations([]); loginAs(u.username); setTab('CATALOG'); }
   };
 
   /* ── API Actions ── */
@@ -140,14 +152,38 @@ export function App() {
     return false;
   };
 
-  /* ── Loading state ── */
-  if (!currentUser || !appReady) {
+  const handleRegister = async (data: { username: string; name: string; department: string; password: string }) => {
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const json = await res.json();
+      if (res.ok && json.token) {
+        setToken(json.token);
+        setCurrentUser(json.user);
+        fetchReservations(json.token);
+        setShowRegister(false);
+        return { success: true };
+      }
+      return { success: false, error: json.error || 'Registration failed' };
+    } catch { return { success: false, error: 'Network error' }; }
+  };
+
+  /* ── Loading / Login state ── */
+  if (!appReady) {
     return (
       <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:16 }}>
         <div className="spinner" style={{ width:48, height:48 }} />
         <p style={{ color:'var(--text-3)', fontSize:'0.9rem' }}>Initialising EquipFlow...</p>
       </div>
     );
+  }
+
+  if (!currentUser) {
+    if (showRegister) return <Register onRegister={handleRegister} onBackToLogin={() => setShowRegister(false)} />;
+    return <Login onLogin={loginAs} onShowRegister={() => setShowRegister(true)} />;
   }
 
   const pending = reservations.filter(r => r.status === 'PENDING');
