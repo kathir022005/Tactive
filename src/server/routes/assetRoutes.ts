@@ -1,84 +1,61 @@
 import { Router, Request, Response } from 'express';
-import { db } from '../db/database.js';
+import { Asset, Reservation, Blackout } from '../db/models.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { validateBody, createAssetSchema } from '../middleware/validation.js';
 
 export const assetRouter = Router();
 
-// GET all assets
-assetRouter.get('/', (req: Request, res: Response) => {
+// GET all assets (with optional search/filter)
+assetRouter.get('/', async (req: Request, res: Response) => {
   const { category, search, status } = req.query;
+  const filter: any = {};
 
-  let query = 'SELECT * FROM assets WHERE 1=1';
-  const params: any[] = [];
-
-  if (category) {
-    query += ' AND category = ?';
-    params.push(category);
-  }
-
-  if (status) {
-    query += ' AND status = ?';
-    params.push(status);
-  }
-
+  if (category) filter.category = category;
+  if (status)   filter.status   = status;
   if (search) {
-    query += ' AND (name LIKE ? OR serial_number LIKE ? OR description LIKE ?)';
-    const searchPattern = `%${search}%`;
-    params.push(searchPattern, searchPattern, searchPattern);
+    const re = new RegExp(String(search), 'i');
+    filter.$or = [{ name: re }, { serial_number: re }, { description: re }];
   }
 
-  query += ' ORDER BY name ASC';
-
-  const assets = db.prepare(query).all(...params);
-  return res.json({ assets });
+  const assets = await Asset.find(filter).sort({ name: 1 }).lean();
+  const mapped = assets.map(a => ({ ...a, id: a._id.toString() }));
+  return res.json({ assets: mapped });
 });
 
-// GET single asset details
-assetRouter.get('/:id', (req: Request, res: Response) => {
-  const assetId = parseInt(req.params.id as string, 10);
-  if (isNaN(assetId)) {
-    return res.status(400).json({ error: 'Invalid asset ID' });
-  }
+// GET single asset
+assetRouter.get('/:id', async (req: Request, res: Response) => {
+  const asset = await Asset.findById(req.params.id).lean().catch(() => null);
+  if (!asset) return res.status(404).json({ error: 'Asset not found' });
 
-  const asset = db.prepare('SELECT * FROM assets WHERE id = ?').get(assetId);
-  if (!asset) {
-    return res.status(404).json({ error: 'Asset not found' });
-  }
+  const activeReservations = await Reservation.find({
+    asset_id: asset._id,
+    status:   { $in: ['PENDING', 'CONFIRMED', 'CHECKED_OUT'] },
+  }).populate('user_id', 'name').sort({ start_date: 1 }).lean();
 
-  // Get active reservations for timeline preview
-  const reservations = db.prepare(`
-    SELECT r.id, r.start_date, r.end_date, r.status, u.name as reserved_by
-    FROM reservations r
-    JOIN users u ON r.user_id = u.id
-    WHERE r.asset_id = ? AND r.status IN ('PENDING', 'CONFIRMED', 'CHECKED_OUT')
-    ORDER BY r.start_date ASC
-  `).all(assetId);
+  const blackouts = await Blackout.find({ asset_id: asset._id }).sort({ start_date: 1 }).lean();
 
-  const blackouts = db.prepare(`
-    SELECT id, start_date, end_date, reason 
-    FROM blackouts 
-    WHERE asset_id = ?
-    ORDER BY start_date ASC
-  `).all(assetId);
-
-  return res.json({ asset, activeReservations: reservations, blackouts });
+  return res.json({
+    asset: { ...asset, id: asset._id.toString() },
+    activeReservations,
+    blackouts,
+  });
 });
 
 // POST create asset (Admin only)
-assetRouter.post('/', authenticateToken, requireRole('ADMIN'), validateBody(createAssetSchema), (req: Request, res: Response) => {
+assetRouter.post('/', authenticateToken, requireRole('ADMIN'), validateBody(createAssetSchema), async (req: Request, res: Response) => {
   const { name, category, serialNumber, dailyPenaltyRate, description, location } = req.body;
-
   try {
-    const result = db.prepare(`
-      INSERT INTO assets (name, category, serial_number, daily_penalty_rate, description, location)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(name, category, serialNumber, dailyPenaltyRate, description || '', location || 'Main Office');
-
-    const newAsset = db.prepare('SELECT * FROM assets WHERE id = ?').get(result.lastInsertRowid);
-    return res.status(201).json({ message: 'Asset created successfully', asset: newAsset });
+    const newAsset = await Asset.create({
+      name,
+      category,
+      serial_number:      serialNumber,
+      daily_penalty_rate: dailyPenaltyRate,
+      description:        description || '',
+      location:           location || 'Main Office',
+    });
+    return res.status(201).json({ message: 'Asset created successfully', asset: { ...newAsset.toObject(), id: newAsset._id.toString() } });
   } catch (err: any) {
-    if (err.message.includes('UNIQUE constraint failed')) {
+    if (err.code === 11000) {
       return res.status(400).json({ error: 'An asset with this serial number already exists.' });
     }
     return res.status(500).json({ error: 'Failed to create asset' });

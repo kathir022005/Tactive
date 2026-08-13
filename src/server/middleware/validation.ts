@@ -28,7 +28,7 @@ export const loginSchema = z.object({
 });
 
 export const createReservationSchema = z.object({
-  assetId: z.number().int().positive('assetId must be a positive integer'),
+  assetId: z.union([z.string().min(1, 'assetId is required'), z.number().int().positive()]),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'startDate must be in format YYYY-MM-DD'),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'endDate must be in format YYYY-MM-DD'),
   notes: z.string().max(500).optional()
@@ -44,7 +44,7 @@ export const createAssetSchema = z.object({
 });
 
 export const createBlackoutSchema = z.object({
-  assetId: z.number().int().positive(),
+  assetId: z.union([z.string().min(1, 'assetId is required'), z.number().int().positive()]),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   reason: z.string().min(3, 'Reason is required')

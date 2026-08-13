@@ -26,19 +26,20 @@
   "author": "Assessment Submission",
   "license": "MIT",
   "dependencies": {
-    "better-sqlite3": "^13.0.3",
+    "@types/pdfkit": "^0.17.6",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.31.0",
+    "mongoose": "^9.9.2",
+    "pdfkit": "^0.19.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
-    "@types/better-sqlite3": "^9.6.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",

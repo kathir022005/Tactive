@@ -1,15 +1,30 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
+import mongoose from 'mongoose';
 import { createApp } from '../../src/server/app.js';
+import { connectDB } from '../../src/server/db/database.js';
+import { Reservation, Blackout } from '../../src/server/db/models.js';
 
 let app: any;
 let adminToken: string;
 let standardToken: string;
 let vipToken: string;
 
-describe('EquipFlow — Complete QA Automation API Test Suite', () => {
+let macbook: any;
+let sony: any;
+let fluke: any;
+let dji: any;
+let dell: any;
+
+describe('EquipFlow — Complete QA Automation API Test Suite (MongoDB)', () => {
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
+    await connectDB();
+    
+    // Clear test reservations & blackouts for clean test state
+    await Reservation.deleteMany({});
+    await Blackout.deleteMany({});
+
     app = createApp();
 
     // ── Authenticate all test users ──
@@ -30,6 +45,19 @@ describe('EquipFlow — Complete QA Automation API Test Suite', () => {
       .send({ username: 'jane_doe', password: 'user123' });
     vipToken = vipLogin.body.token;
     expect(vipToken, 'VIP user login must succeed').toBeDefined();
+
+    // Fetch seeded assets and map by serial_number
+    const assetsRes = await request(app).get('/api/assets');
+    const assetList = assetsRes.body.assets;
+    macbook = assetList.find((a: any) => a.serial_number === 'MBP-2024-9901');
+    sony    = assetList.find((a: any) => a.serial_number === 'SNY-A7IV-0042');
+    fluke   = assetList.find((a: any) => a.serial_number === 'FLK-OSC-7712');
+    dji     = assetList.find((a: any) => a.serial_number === 'DJI-INS3-8821');
+    dell    = assetList.find((a: any) => a.serial_number === 'DELL-U38-3310');
+  }, 30000);
+
+  afterAll(async () => {
+    await mongoose.disconnect();
   });
 
   // ═══════════════════════════════════════════════════════════════
@@ -53,30 +81,30 @@ describe('EquipFlow — Complete QA Automation API Test Suite', () => {
       const res = await request(app)
         .post('/api/reservations')
         .set('Authorization', `Bearer ${vipToken}`)
-        .send({ assetId: 1, startDate: '2026-09-01', endDate: '2026-09-05', notes: 'VIP auto-approval test' });
+        .send({ assetId: macbook.id, startDate: '2026-09-01', endDate: '2026-09-05', notes: 'VIP auto-approval test' });
 
       expect(res.status).toBe(201);
       expect(res.body.reservation.status).toBe('CONFIRMED');
-      expect(res.body.reservation.is_vip_auto_approved).toBe(1);
+      expect(Boolean(res.body.reservation.is_vip_auto_approved)).toBe(true);
     });
 
     it('Standard User creates reservation → enters PENDING review queue', async () => {
       const res = await request(app)
         .post('/api/reservations')
         .set('Authorization', `Bearer ${standardToken}`)
-        .send({ assetId: 2, startDate: '2026-09-10', endDate: '2026-09-12', notes: 'Standard pending test' });
+        .send({ assetId: sony.id, startDate: '2026-09-10', endDate: '2026-09-12', notes: 'Standard pending test' });
 
       expect(res.status).toBe(201);
       expect(res.body.reservation.status).toBe('PENDING');
     });
 
     it('Admin can approve a pending reservation', async () => {
-      // Create pending booking first
       const booking = await request(app)
         .post('/api/reservations')
         .set('Authorization', `Bearer ${standardToken}`)
-        .send({ assetId: 5, startDate: '2026-11-01', endDate: '2026-11-03' });
+        .send({ assetId: dell.id, startDate: '2026-11-01', endDate: '2026-11-03' });
 
+      expect(booking.status).toBe(201);
       const resId = booking.body.reservation.id;
       const approve = await request(app)
         .post(`/api/reservations/${resId}/approve`)
@@ -90,8 +118,9 @@ describe('EquipFlow — Complete QA Automation API Test Suite', () => {
       const booking = await request(app)
         .post('/api/reservations')
         .set('Authorization', `Bearer ${standardToken}`)
-        .send({ assetId: 5, startDate: '2026-11-20', endDate: '2026-11-22' });
+        .send({ assetId: dell.id, startDate: '2026-11-20', endDate: '2026-11-22' });
 
+      expect(booking.status).toBe(201);
       const resId = booking.body.reservation.id;
       const reject = await request(app)
         .post(`/api/reservations/${resId}/reject`)
@@ -104,8 +133,9 @@ describe('EquipFlow — Complete QA Automation API Test Suite', () => {
       const booking = await request(app)
         .post('/api/reservations')
         .set('Authorization', `Bearer ${standardToken}`)
-        .send({ assetId: 5, startDate: '2026-12-10', endDate: '2026-12-12' });
+        .send({ assetId: dell.id, startDate: '2026-12-10', endDate: '2026-12-12' });
 
+      expect(booking.status).toBe(201);
       const cancel = await request(app)
         .post(`/api/reservations/${booking.body.reservation.id}/cancel`)
         .set('Authorization', `Bearer ${standardToken}`);
@@ -119,11 +149,11 @@ describe('EquipFlow — Complete QA Automation API Test Suite', () => {
   // ═══════════════════════════════════════════════════════════════
   describe('2. Business Rules & Edge Cases', () => {
     it('CONFLICT: Overlapping dates for same asset must be rejected (409)', async () => {
-      // Asset 1 is booked 2026-09-01 → 2026-09-05 from Happy Path
+      // macbook is booked 2026-09-01 → 2026-09-05 from Happy Path
       const res = await request(app)
         .post('/api/reservations')
         .set('Authorization', `Bearer ${standardToken}`)
-        .send({ assetId: 1, startDate: '2026-09-03', endDate: '2026-09-07' });
+        .send({ assetId: macbook.id, startDate: '2026-09-03', endDate: '2026-09-07' });
 
       expect(res.status).toBe(409);
       expect(res.body.error).toContain('conflict');
@@ -131,33 +161,41 @@ describe('EquipFlow — Complete QA Automation API Test Suite', () => {
     });
 
     it('QUOTA: Standard user blocked after 3 active reservations (4th attempt must fail)', async () => {
-      // john_smith already has 1 active from happy path (assetId 2, pending)
-      // Add 2 more to reach quota of 3
+      // Clear standard user's previous reservations for precise quota test
+      const stdUserRes = await request(app).get('/api/reservations?mine=true').set('Authorization', `Bearer ${standardToken}`);
+      for (const r of stdUserRes.body.reservations) {
+        if (r.status === 'PENDING' || r.status === 'CONFIRMED') {
+          await request(app).post(`/api/reservations/${r.id}/cancel`).set('Authorization', `Bearer ${standardToken}`);
+        }
+      }
+
+      // Create 3 active reservations
       await request(app).post('/api/reservations').set('Authorization', `Bearer ${standardToken}`)
-        .send({ assetId: 3, startDate: '2026-10-01', endDate: '2026-10-03' });
+        .send({ assetId: sony.id, startDate: '2026-10-01', endDate: '2026-10-03' });
       await request(app).post('/api/reservations').set('Authorization', `Bearer ${standardToken}`)
-        .send({ assetId: 5, startDate: '2026-10-08', endDate: '2026-10-10' });
+        .send({ assetId: fluke.id, startDate: '2026-10-01', endDate: '2026-10-03' });
+      await request(app).post('/api/reservations').set('Authorization', `Bearer ${standardToken}`)
+        .send({ assetId: dell.id, startDate: '2026-10-08', endDate: '2026-10-10' });
 
       // 4th must be blocked
       const fourth = await request(app)
         .post('/api/reservations')
         .set('Authorization', `Bearer ${standardToken}`)
-        .send({ assetId: 1, startDate: '2026-10-20', endDate: '2026-10-22' });
+        .send({ assetId: macbook.id, startDate: '2026-10-20', endDate: '2026-10-22' });
 
       expect(fourth.status).toBe(400);
       expect(fourth.body.error).toContain('quota exceeded');
     });
 
     it('BLACKOUT: Reservation blocked during admin-declared maintenance window', async () => {
-      // Declare blackout on asset 5 for December
       await request(app).post('/api/admin/blackouts')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ assetId: 5, startDate: '2026-12-20', endDate: '2026-12-31', reason: 'Year-end firmware upgrade' });
+        .send({ assetId: dell.id, startDate: '2026-12-20', endDate: '2026-12-31', reason: 'Year-end firmware upgrade' });
 
       const res = await request(app)
         .post('/api/reservations')
         .set('Authorization', `Bearer ${vipToken}`)
-        .send({ assetId: 5, startDate: '2026-12-22', endDate: '2026-12-25' });
+        .send({ assetId: dell.id, startDate: '2026-12-22', endDate: '2026-12-25' });
 
       expect(res.status).toBe(409);
       expect(res.body.reason).toContain('maintenance blackout');
@@ -167,7 +205,7 @@ describe('EquipFlow — Complete QA Automation API Test Suite', () => {
       const booking = await request(app)
         .post('/api/reservations')
         .set('Authorization', `Bearer ${vipToken}`)
-        .send({ assetId: 5, startDate: '2026-07-20', endDate: '2026-07-28' });
+        .send({ assetId: dell.id, startDate: '2026-07-20', endDate: '2026-07-28' });
 
       expect(booking.status).toBe(201);
       const resId = booking.body.reservation.id;
@@ -180,7 +218,7 @@ describe('EquipFlow — Complete QA Automation API Test Suite', () => {
       expect(returnRes.status).toBe(200);
       expect(returnRes.body.penaltyDetails.isOverdue).toBe(true);
       expect(returnRes.body.penaltyDetails.overdueDays).toBe(3);
-      // $30 * 3 = $90 raw → 50% VIP discount = $45
+      // Dell asset daily penalty rate is $30 → $30 * 3 = $90 raw → 50% VIP discount = $45
       expect(returnRes.body.penaltyDetails.penaltyFee).toBe(45.0);
       expect(returnRes.body.penaltyDetails.appliedDiscountPercentage).toBe(50);
     });
@@ -189,12 +227,13 @@ describe('EquipFlow — Complete QA Automation API Test Suite', () => {
       const booking = await request(app)
         .post('/api/reservations')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ assetId: 1, startDate: '2026-08-05', endDate: '2026-08-10' });
+        .send({ assetId: macbook.id, startDate: '2026-08-05', endDate: '2026-08-10' });
 
+      expect(booking.status).toBe(201);
       const returnRes = await request(app)
         .post(`/api/reservations/${booking.body.reservation.id}/return`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ returnDate: '2026-08-10' }); // Exact return date, no overdue
+        .send({ returnDate: '2026-08-10' });
 
       expect(returnRes.status).toBe(200);
       expect(returnRes.body.penaltyDetails.isOverdue).toBe(false);
@@ -210,7 +249,7 @@ describe('EquipFlow — Complete QA Automation API Test Suite', () => {
       const res = await request(app)
         .post('/api/reservations')
         .set('Authorization', `Bearer ${vipToken}`)
-        .send({ assetId: 2, startDate: '2026-12-10', endDate: '2026-12-05' });
+        .send({ assetId: sony.id, startDate: '2026-12-10', endDate: '2026-12-05' });
 
       expect(res.status).toBe(409);
       expect(res.body.reason).toContain('after end date');
@@ -220,7 +259,7 @@ describe('EquipFlow — Complete QA Automation API Test Suite', () => {
       const res = await request(app)
         .post('/api/reservations')
         .set('Authorization', `Bearer ${vipToken}`)
-        .send({ assetId: 2, startDate: '2026-12-01', endDate: '2026-12-30' });
+        .send({ assetId: sony.id, startDate: '2026-12-01', endDate: '2026-12-30' });
 
       expect(res.status).toBe(409);
       expect(res.body.reason).toContain('14 days');
@@ -230,7 +269,7 @@ describe('EquipFlow — Complete QA Automation API Test Suite', () => {
       const res = await request(app)
         .post('/api/reservations')
         .set('Authorization', `Bearer ${vipToken}`)
-        .send({ assetId: 99999, startDate: '2026-12-01', endDate: '2026-12-05' });
+        .send({ assetId: '60c72b2f9b1d8b2b9c8b4567', startDate: '2026-12-01', endDate: '2026-12-05' });
 
       expect(res.status).toBe(404);
     });
@@ -238,7 +277,7 @@ describe('EquipFlow — Complete QA Automation API Test Suite', () => {
     it('REJECT: Unauthenticated request returns 401', async () => {
       const res = await request(app)
         .post('/api/reservations')
-        .send({ assetId: 1, startDate: '2026-12-01', endDate: '2026-12-05' });
+        .send({ assetId: macbook.id, startDate: '2026-12-01', endDate: '2026-12-05' });
 
       expect(res.status).toBe(401);
     });
@@ -247,7 +286,7 @@ describe('EquipFlow — Complete QA Automation API Test Suite', () => {
       const res = await request(app)
         .post('/api/admin/blackouts')
         .set('Authorization', `Bearer ${standardToken}`)
-        .send({ assetId: 1, startDate: '2026-12-01', endDate: '2026-12-05', reason: 'Unauthorized attempt' });
+        .send({ assetId: macbook.id, startDate: '2026-12-01', endDate: '2026-12-05', reason: 'Unauthorized attempt' });
 
       expect(res.status).toBe(403);
     });
@@ -256,7 +295,7 @@ describe('EquipFlow — Complete QA Automation API Test Suite', () => {
       const res = await request(app)
         .post('/api/reservations')
         .set('Authorization', `Bearer ${vipToken}`)
-        .send({ assetId: 1 }); // missing startDate & endDate
+        .send({ assetId: macbook.id });
 
       expect(res.status).toBe(400);
       expect(res.body.details).toBeDefined();
@@ -266,7 +305,7 @@ describe('EquipFlow — Complete QA Automation API Test Suite', () => {
       const res = await request(app)
         .post('/api/reservations')
         .set('Authorization', `Bearer ${vipToken}`)
-        .send({ assetId: 1, startDate: '01/12/2026', endDate: '05/12/2026' }); // wrong format
+        .send({ assetId: macbook.id, startDate: '01/12/2026', endDate: '05/12/2026' });
 
       expect(res.status).toBe(400);
     });

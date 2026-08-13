@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { db } from '../db/database.js';
+import { Asset, Blackout, AuditLog } from '../db/models.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { validateBody, createBlackoutSchema } from '../middleware/validation.js';
 
@@ -7,37 +7,48 @@ export const adminRouter = Router();
 
 adminRouter.use(authenticateToken, requireRole('ADMIN'));
 
-// Create Blackout Period
-adminRouter.post('/blackouts', validateBody(createBlackoutSchema), (req: Request, res: Response) => {
+// POST create blackout
+adminRouter.post('/blackouts', validateBody(createBlackoutSchema), async (req: Request, res: Response) => {
   const { assetId, startDate, endDate, reason } = req.body;
 
-  const asset = db.prepare('SELECT id FROM assets WHERE id = ?').get(assetId);
-  if (!asset) {
-    return res.status(404).json({ error: 'Asset not found.' });
-  }
+  const asset = await Asset.findById(assetId).lean().catch(() => null);
+  if (!asset) return res.status(404).json({ error: 'Asset not found.' });
 
-  const result = db.prepare(`
-    INSERT INTO blackouts (asset_id, start_date, end_date, reason)
-    VALUES (?, ?, ?, ?)
-  `).run(assetId, startDate, endDate, reason);
+  const newBlackout = await Blackout.create({
+    asset_id:   assetId,
+    start_date: startDate,
+    end_date:   endDate,
+    reason,
+  });
 
-  const newBlackout = db.prepare('SELECT * FROM blackouts WHERE id = ?').get(result.lastInsertRowid);
-  return res.status(201).json({ message: 'Blackout window created', blackout: newBlackout });
+  return res.status(201).json({
+    message: 'Blackout window created',
+    blackout: { ...newBlackout.toObject(), id: newBlackout._id.toString(), asset_name: asset.name },
+  });
 });
 
-// GET Blackouts
-adminRouter.get('/blackouts', (req: Request, res: Response) => {
-  const blackouts = db.prepare(`
-    SELECT b.*, a.name as asset_name 
-    FROM blackouts b 
-    JOIN assets a ON b.asset_id = a.id 
-    ORDER BY b.start_date DESC
-  `).all();
-  return res.json({ blackouts });
+// GET all blackouts
+adminRouter.get('/blackouts', async (_req: Request, res: Response) => {
+  const blackouts = await Blackout.find({})
+    .populate('asset_id', 'name')
+    .sort({ start_date: -1 })
+    .lean();
+
+  const mapped = blackouts.map(b => ({
+    id:         b._id.toString(),
+    asset_id:   (b.asset_id as any)?._id?.toString(),
+    asset_name: (b.asset_id as any)?.name,
+    start_date: b.start_date,
+    end_date:   b.end_date,
+    reason:     b.reason,
+    createdAt:  b.createdAt,
+  }));
+
+  return res.json({ blackouts: mapped });
 });
 
-// GET Audit Logs
-adminRouter.get('/audit-logs', (req: Request, res: Response) => {
-  const logs = db.prepare('SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 100').all();
+// GET audit logs
+adminRouter.get('/audit-logs', async (_req: Request, res: Response) => {
+  const logs = await AuditLog.find({}).sort({ timestamp: -1 }).limit(100).lean();
   return res.json({ auditLogs: logs });
 });

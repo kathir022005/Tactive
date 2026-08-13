@@ -1,16 +1,12 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import path from 'path';
-import { initializeDatabase } from './db/database.js';
 import { authRouter } from './routes/authRoutes.js';
 import { assetRouter } from './routes/assetRoutes.js';
 import { reservationRouter } from './routes/reservationRoutes.js';
 import { adminRouter } from './routes/adminRoutes.js';
 
 export function createApp() {
-  // Initialize Database
-  initializeDatabase();
-
   const app = express();
 
   // Middleware
@@ -24,8 +20,8 @@ export function createApp() {
   app.use('/api/admin', adminRouter);
 
   // Health Check
-  app.get('/api/health', (req: Request, res: Response) => {
-    res.json({ status: 'ok', service: 'EquipFlow API', timestamp: new Date().toISOString() });
+  app.get('/api/health', (_req: Request, res: Response) => {
+    res.json({ status: 'ok', service: 'EquipFlow API (MongoDB)', timestamp: new Date().toISOString() });
   });
 
   // Serve static files in production
@@ -46,7 +42,7 @@ export function createApp() {
   });
 
   // Global Error Handler
-  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     console.error('Unhandled API Error:', err);
     res.status(500).json({ error: 'Internal server error', message: err.message });
   });

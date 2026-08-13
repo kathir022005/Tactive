@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 export const JWT_SECRET = process.env.JWT_SECRET || 'equipflow-super-secret-key-2026';
 
 export interface AuthenticatedUser {
-  id: number;
+  id: string;
   username: string;
   name: string;
   role: 'STANDARD' | 'VIP' | 'ADMIN';
