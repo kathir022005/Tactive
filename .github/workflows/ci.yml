@@ -11,11 +11,17 @@ jobs:
     name: 🏗️ Build & Run Test Suite
     runs-on: ubuntu-latest
 
-    env:
-      MONGO_URI: mongodb+srv://kathirashok255:Akkathir2005@cluster0.ly7x9.mongodb.net/equipflow?appName=Cluster0
-      JWT_SECRET: equipflow_super_secret_jwt_key_2024
-      NODE_ENV: test
-      PORT: 3000
+    # ── Spin up a local MongoDB container for CI ──────────────────────────────
+    services:
+      mongodb:
+        image: mongo:6
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 27017:27017
 
     steps:
       - name: 📥 Checkout Repository
@@ -32,12 +38,27 @@ jobs:
 
       - name: 🔨 Build Client & Server
         run: npm run build
+        env:
+          MONGO_URI: mongodb://localhost:27017/equipflow-test
+          JWT_SECRET: equipflow_super_secret_jwt_key_2024
+          NODE_ENV: test
+          PORT: 3000
 
       - name: 🧪 Run API Unit & Integration Tests (Vitest) — GREEN RUN (21/21)
         run: npm run test:unit
+        env:
+          MONGO_URI: mongodb://localhost:27017/equipflow-test
+          JWT_SECRET: equipflow_super_secret_jwt_key_2024
+          NODE_ENV: test
+          PORT: 3000
 
       - name: 🔴 Run Deliberate Red Run (Failure Evidence)
         run: npm run test:red || true
+        env:
+          MONGO_URI: mongodb://localhost:27017/equipflow-test
+          JWT_SECRET: equipflow_super_secret_jwt_key_2024
+          NODE_ENV: test
+          PORT: 3000
 
       - name: 📄 Upload Red Run Report
         uses: actions/upload-artifact@v4

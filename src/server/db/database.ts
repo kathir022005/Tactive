@@ -2,7 +2,8 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import { User, Asset } from './models.js';
 
-dotenv.config();
+// override: false → CI-injected env vars win over local .env file
+dotenv.config({ override: false });
 
 const MONGO_URI = process.env.MONGO_URI || '';
 
@@ -17,7 +18,13 @@ export async function connectDB(): Promise<void> {
     await seedInitialData();
   } catch (err) {
     console.error('❌ MongoDB connection failed:', err);
-    process.exit(1);
+    // In test environments, throw so Vitest can report the error cleanly.
+    // In production, exit the process.
+    if (process.env.NODE_ENV === 'test') {
+      throw err;
+    } else {
+      process.exit(1);
+    }
   }
 }
 
