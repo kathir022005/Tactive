@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { Asset, Reservation, Blackout } from '../db/models.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
-import { validateBody, createAssetSchema } from '../middleware/validation.js';
+import { validateBody, createAssetSchema, updateAssetSchema } from '../middleware/validation.js';
 
 export const assetRouter = Router();
 
@@ -60,4 +60,36 @@ assetRouter.post('/', authenticateToken, requireRole('ADMIN'), validateBody(crea
     }
     return res.status(500).json({ error: 'Failed to create asset' });
   }
+});
+
+// PUT update asset (Admin only)
+assetRouter.put('/:id', authenticateToken, requireRole('ADMIN'), validateBody(updateAssetSchema), async (req: Request, res: Response) => {
+  const { name, category, serialNumber, status, dailyPenaltyRate, description, location } = req.body;
+
+  const updateFields: any = {};
+  if (name !== undefined)             updateFields.name = name;
+  if (category !== undefined)         updateFields.category = category;
+  if (serialNumber !== undefined)     updateFields.serial_number = serialNumber;
+  if (status !== undefined)           updateFields.status = status;
+  if (dailyPenaltyRate !== undefined) updateFields.daily_penalty_rate = dailyPenaltyRate;
+  if (description !== undefined)      updateFields.description = description;
+  if (location !== undefined)         updateFields.location = location;
+
+  try {
+    const updated = await Asset.findByIdAndUpdate(req.params.id, updateFields, { new: true }).lean();
+    if (!updated) return res.status(404).json({ error: 'Asset not found' });
+    return res.json({ message: 'Asset updated successfully', asset: { ...updated, id: updated._id.toString() } });
+  } catch (err: any) {
+    if (err.code === 11000) {
+      return res.status(400).json({ error: 'An asset with this serial number already exists.' });
+    }
+    return res.status(500).json({ error: 'Failed to update asset' });
+  }
+});
+
+// DELETE asset (Admin only)
+assetRouter.delete('/:id', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  const deleted = await Asset.findByIdAndDelete(req.params.id);
+  if (!deleted) return res.status(404).json({ error: 'Asset not found' });
+  return res.json({ message: 'Asset deleted successfully' });
 });

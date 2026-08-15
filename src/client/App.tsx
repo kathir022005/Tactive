@@ -142,6 +142,25 @@ export function App() {
     return false;
   };
 
+  const handleUpdateAsset = async (id: string | number, data: any) => {
+    const res = await fetch(`/api/assets/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) { fetchAssets(); return true; }
+    return false;
+  };
+
+  const handleDeleteAsset = async (id: string | number) => {
+    const res = await fetch(`/api/assets/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.ok) { fetchAssets(); return true; }
+    return false;
+  };
+
   const handleCreateBlackout = async (data: any) => {
     const res = await fetch('/api/admin/blackouts', {
       method: 'POST',
@@ -273,6 +292,8 @@ export function App() {
             onApprove={handleApprove}
             onReject={handleReject}
             onCreateAsset={handleCreateAsset}
+            onUpdateAsset={handleUpdateAsset}
+            onDeleteAsset={handleDeleteAsset}
             onCreateBlackout={handleCreateBlackout}
           />
         )}

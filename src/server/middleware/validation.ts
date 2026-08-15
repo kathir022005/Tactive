@@ -49,3 +49,13 @@ export const createBlackoutSchema = z.object({
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   reason: z.string().min(3, 'Reason is required')
 });
+
+export const updateAssetSchema = z.object({
+  name: z.string().min(2).max(100).optional(),
+  category: z.string().min(2).max(50).optional(),
+  serialNumber: z.string().min(2).max(50).optional(),
+  status: z.enum(['AVAILABLE', 'MAINTENANCE', 'RETIRED']).optional(),
+  dailyPenaltyRate: z.number().positive().optional(),
+  description: z.string().optional(),
+  location: z.string().optional()
+});

@@ -309,5 +309,25 @@ describe('EquipFlow — Complete QA Automation API Test Suite (MongoDB)', () => 
 
       expect(res.status).toBe(400);
     });
+
+    it('ADMIN: Can update asset product details (PUT /api/assets/:id)', async () => {
+      const updateRes = await request(app)
+        .put(`/api/assets/${macbook.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'MacBook Pro M3 Max 16" (Updated)', dailyPenaltyRate: 85.0 });
+
+      expect(updateRes.status).toBe(200);
+      expect(updateRes.body.asset.name).toBe('MacBook Pro M3 Max 16" (Updated)');
+      expect(updateRes.body.asset.daily_penalty_rate).toBe(85.0);
+    });
+
+    it('REJECT: Standard user cannot update asset product details (403 Forbidden)', async () => {
+      const updateRes = await request(app)
+        .put(`/api/assets/${macbook.id}`)
+        .set('Authorization', `Bearer ${standardToken}`)
+        .send({ name: 'Unauthorized Change' });
+
+      expect(updateRes.status).toBe(403);
+    });
   });
 });
