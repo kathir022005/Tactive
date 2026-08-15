@@ -7,7 +7,8 @@ import { AdminPanel } from './components/AdminPanel.js';
 import { Login } from './components/Login.js';
 import { Register } from './components/Register.js';
 import { User, Asset, Reservation, Blackout } from './types.js';
-import { LayoutGrid, CalendarCheck, ShieldCheck } from 'lucide-react';
+import { LayoutGrid, CalendarCheck, ShieldCheck, Package, Zap, Users } from 'lucide-react';
+import './styles/index.css';
 import './styles/login.css';
 
 export function App() {
@@ -223,16 +224,47 @@ export function App() {
       />
 
       <main className="main-container">
+        {/* Role Context Banner */}
+        {currentUser.role === 'ADMIN' && (
+          <div className="role-banner role-banner-admin">
+            <div className="role-banner-icon role-banner-icon-admin"><ShieldCheck size={16} /></div>
+            <div>
+              <strong>Admin Panel Active</strong> — You can manage inventory, add/edit/delete equipment, approve or reject pending reservations, and declare maintenance blackouts. Switch to another user to test standard flows.
+            </div>
+          </div>
+        )}
+        {currentUser.role === 'VIP' && (
+          <div className="role-banner role-banner-vip">
+            <div className="role-banner-icon role-banner-icon-vip"><Zap size={16} /></div>
+            <div>
+              <strong>VIP Member</strong> — Your reservations are auto-confirmed instantly (no admin approval required). You also receive a 50% discount on late-return penalties.
+            </div>
+          </div>
+        )}
+        {currentUser.role === 'STANDARD' && (
+          <div className="role-banner role-banner-user">
+            <div className="role-banner-icon role-banner-icon-user"><Users size={16} /></div>
+            <div>
+              <strong>Standard Account</strong> — Browse and reserve available equipment below. Your reservations enter a pending queue for admin approval. You can hold up to 3 active reservations.
+            </div>
+          </div>
+        )}
+
         {/* Stats Bar */}
         <div className="stats-bar">
-          {[
-            { label:'Total Assets', value: assets.length, cls:'stat-icon-blue', Icon: LayoutGrid },
-            { label:'Available Now', value: availableCount, cls:'stat-icon-green', Icon: CalendarCheck },
-            { label:'My Bookings', value: reservations.length, cls:'stat-icon-purple', Icon: CalendarCheck },
-            { label:'Pending Review', value: pending.length, cls:'stat-icon-amber', Icon: ShieldCheck },
-          ].map(({ label, value, cls, Icon }) => (
+          {(currentUser.role === 'ADMIN' ? [
+            { label:'Total Assets',       value: assets.length,         cls:'stat-icon-blue',   Icon: Package },
+            { label:'Available Now',      value: availableCount,         cls:'stat-icon-green',  Icon: CalendarCheck },
+            { label:'Pending Approvals',  value: pending.length,         cls:'stat-icon-amber',  Icon: ShieldCheck },
+            { label:'Active Blackouts',   value: blackouts.length,       cls:'stat-icon-rose',   Icon: LayoutGrid },
+          ] : [
+            { label:'Total Assets',  value: assets.length,         cls:'stat-icon-blue',   Icon: Package },
+            { label:'Available Now', value: availableCount,         cls:'stat-icon-green',  Icon: CalendarCheck },
+            { label:'My Bookings',   value: reservations.length,    cls:'stat-icon-purple', Icon: CalendarCheck },
+            { label:'Pending Review',value: pending.length,         cls:'stat-icon-amber',  Icon: ShieldCheck },
+          ]).map(({ label, value, cls, Icon }) => (
             <div className="stat-card" key={label}>
-              <div className={`stat-icon ${cls}`}><Icon size={20} /></div>
+              <div className={`stat-icon ${cls}`}><Icon size={19} /></div>
               <div>
                 <div className="stat-label">{label}</div>
                 <div className="stat-value">{value}</div>
@@ -248,25 +280,25 @@ export function App() {
             onClick={() => setTab('CATALOG')}
             id="tab-catalog"
           >
-            <LayoutGrid size={16} /> Equipment Catalog
+            <LayoutGrid size={15} /> Equipment Catalog
           </button>
           <button
             className={`tab-btn ${tab === 'MY_RESERVATIONS' ? 'active' : ''}`}
             onClick={() => setTab('MY_RESERVATIONS')}
             id="tab-my-reservations"
           >
-            <CalendarCheck size={16} /> My Reservations
+            <CalendarCheck size={15} /> My Reservations
             {reservations.length > 0 && (
               <span className="tab-badge">{reservations.length}</span>
             )}
           </button>
           {currentUser.role === 'ADMIN' && (
             <button
-              className={`tab-btn ${tab === 'ADMIN' ? 'active' : ''}`}
+              className={`tab-btn tab-admin ${tab === 'ADMIN' ? 'active tab-admin' : ''}`}
               onClick={() => setTab('ADMIN')}
               id="tab-admin"
             >
-              <ShieldCheck size={16} /> Admin
+              <ShieldCheck size={15} /> Admin Panel
               {pending.length > 0 && <span className="tab-badge">{pending.length}</span>}
             </button>
           )}

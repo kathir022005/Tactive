@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import {
   ShieldCheck, CheckCircle2, X, PlusCircle, AlertOctagon,
-  ClipboardList, Package, AlertTriangle, Info, Edit3, Trash2
+  ClipboardList, Package, AlertTriangle, Info, Edit3, Trash2,
+  Settings, CalendarOff, Lock
 } from 'lucide-react';
 import { Reservation, Asset, Blackout } from '../types.js';
 
@@ -25,7 +26,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [showBlackoutModal, setShowBlackoutModal] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
 
-  // Asset creation form
+  // Create form
   const [assetName, setAssetName] = useState('');
   const [category, setCategory] = useState('Laptop');
   const [serial, setSerial] = useState('');
@@ -34,7 +35,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [desc, setDesc] = useState('');
   const [assetError, setAssetError] = useState('');
 
-  // Asset edit form
+  // Edit form
   const [editName, setEditName] = useState('');
   const [editCategory, setEditCategory] = useState('');
   const [editSerial, setEditSerial] = useState('');
@@ -54,7 +55,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     e.preventDefault();
     setAssetError('');
     const ok = await onCreateAsset({ name:assetName, category, serialNumber:serial, dailyPenaltyRate:rate, location, description:desc });
-    if (ok) { setShowAssetModal(false); setAssetName(''); setSerial(''); }
+    if (ok) { setShowAssetModal(false); setAssetName(''); setSerial(''); setDesc(''); }
     else setAssetError('Failed to create asset. Serial number may already exist.');
   };
 
@@ -65,7 +66,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setEditSerial(asset.serial_number);
     setEditStatus(asset.status);
     setEditRate(asset.daily_penalty_rate);
-    setEditLocation(asset.location || 'Main Office');
+    setEditLocation(asset.location || '');
     setEditDesc(asset.description || '');
     setEditError('');
   };
@@ -75,24 +76,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (!editingAsset || !onUpdateAsset) return;
     setEditError('');
     const ok = await onUpdateAsset(editingAsset.id, {
-      name: editName,
-      category: editCategory,
-      serialNumber: editSerial,
-      status: editStatus,
-      dailyPenaltyRate: editRate,
-      location: editLocation,
-      description: editDesc
+      name: editName, category: editCategory, serialNumber: editSerial,
+      status: editStatus, dailyPenaltyRate: editRate, location: editLocation, description: editDesc
     });
-    if (ok) {
-      setEditingAsset(null);
-    } else {
-      setEditError('Failed to update asset. Check serial number or inputs.');
-    }
+    if (ok) setEditingAsset(null);
+    else setEditError('Failed to update. Check serial number or inputs.');
   };
 
-  const handleDelete = async (id: string | number) => {
+  const handleDelete = async (id: string | number, name: string) => {
     if (!onDeleteAsset) return;
-    if (window.confirm('Are you sure you want to delete this asset from inventory?')) {
+    if (window.confirm(`Delete "${name}" from inventory? This cannot be undone.`)) {
       await onDeleteAsset(id);
     }
   };
@@ -103,72 +96,63 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (ok) { setShowBlackoutModal(false); setBoStart(''); setBoEnd(''); setBoReason(''); }
   };
 
+  const CATEGORIES = ['Laptop','AV Equipment','Testing Device','Drone','Peripherals','Server','Camera','Other'];
+
   return (
-    <div>
-      {/* Header */}
+    <div className="admin-panel-wrapper">
+
+      {/* ── Header ─────────────────────────────────────────────── */}
       <div className="page-header">
         <div>
-          <h1 className="page-title" style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <ShieldCheck color="var(--amber)" size={26} /> Admin Dashboard
+          <h1 className="page-title">
+            <ShieldCheck color="var(--amber)" size={24} />
+            Admin Control Panel
           </h1>
           <p className="page-subtitle">
-            Manage inventory products, edit equipment details, review pending bookings, and declare maintenance blackouts.
+            Manage equipment inventory · Review reservation requests · Declare maintenance windows
           </p>
         </div>
         <div className="page-actions">
           <button className="btn btn-amber" onClick={() => setShowBlackoutModal(true)} id="add-blackout-btn">
-            <AlertOctagon size={15} /> Declare Blackout
+            <CalendarOff size={14} /> Declare Blackout
           </button>
           <button className="btn btn-primary" onClick={() => setShowAssetModal(true)} id="add-asset-btn">
-            <PlusCircle size={15} /> Add Asset
+            <PlusCircle size={14} /> Add Equipment
           </button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="stats-bar" style={{ marginBottom:28 }}>
-        <div className="stat-card">
-          <div className="stat-icon stat-icon-amber"><ClipboardList size={20} /></div>
-          <div>
-            <div className="stat-label">Pending Approvals</div>
-            <div className="stat-value">{pendingReservations.length}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon stat-icon-blue"><Package size={20} /></div>
-          <div>
-            <div className="stat-label">Total Inventory Assets</div>
-            <div className="stat-value">{assets.length}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon stat-icon-purple"><AlertOctagon size={20} /></div>
-          <div>
-            <div className="stat-label">Active Blackouts</div>
-            <div className="stat-value">{blackouts.length}</div>
-          </div>
+      {/* ── What admin can do — Quick Guide ──────────────────── */}
+      <div className="alert alert-warning" style={{ marginBottom: 24 }}>
+        <Lock size={15} className="alert-icon" />
+        <div>
+          <strong>Admin-only capabilities:</strong> Add new equipment to inventory · Edit asset details (name, status, penalty rate, location) · Delete retired assets · Approve or reject standard user reservation requests · Block equipment during maintenance windows. Standard users and VIP users cannot access this panel.
         </div>
       </div>
 
-      {/* ── Asset Inventory Management Table (ADD & EDIT PRODUCTS) ── */}
-      <div style={{ marginBottom:36 }}>
-        <div className="section-heading">
-          <div className="section-title">
-            <Package size={18} color="var(--blue)" />
-            Inventory & Asset Management (Add / Edit Equipment)
+      {/* ── Section 1: Inventory Management ──────────────────── */}
+      <div className="admin-section">
+        <div className="admin-section-header">
+          <div className="admin-section-title">
+            <Package size={16} color="var(--blue)" />
+            Inventory Management
+            <span className="admin-section-badge">{assets.length} assets</span>
           </div>
+          <button className="btn btn-sm btn-primary" onClick={() => setShowAssetModal(true)}>
+            <PlusCircle size={13} /> Add Equipment
+          </button>
         </div>
-        <div className="glass-panel table-wrapper">
+        <div className="table-wrapper">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Asset Name</th>
+                <th>Equipment Name</th>
                 <th>Category</th>
                 <th>Serial Number</th>
                 <th>Status</th>
                 <th>Penalty Rate</th>
                 <th>Location</th>
-                <th>Actions</th>
+                <th style={{ textAlign:'right' }}>Admin Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -176,36 +160,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <tr key={a.id}>
                   <td>
                     <div className="td-primary">{a.name}</div>
-                    <div style={{ fontSize:'0.75rem', color:'var(--text-3)' }}>{a.description}</div>
+                    {a.description && (
+                      <div style={{ fontSize:'0.74rem', color:'var(--text-3)', marginTop:2 }}>
+                        {a.description.length > 60 ? a.description.slice(0, 60) + '…' : a.description}
+                      </div>
+                    )}
                   </td>
-                  <td>{a.category}</td>
+                  <td>
+                    <span className="cat-tag">{a.category}</span>
+                  </td>
                   <td className="td-mono">{a.serial_number}</td>
                   <td>
-                    <span className={`badge ${
-                      a.status === 'AVAILABLE' ? 'badge-available' :
-                      a.status === 'MAINTENANCE' ? 'badge-maintenance' : 'badge-retired'
-                    }`}>
-                      {a.status}
-                    </span>
+                    <span className={`status-badge status-${a.status}`}>{a.status}</span>
                   </td>
-                  <td className="td-mono" style={{ color:'var(--amber)' }}>${a.daily_penalty_rate}/day</td>
-                  <td>{a.location}</td>
+                  <td style={{ fontFamily:'var(--mono)', fontSize:'0.8rem', color:'var(--amber)', fontWeight:600 }}>
+                    ${a.daily_penalty_rate}/day
+                  </td>
+                  <td style={{ fontSize:'0.82rem', color:'var(--text-3)' }}>{a.location}</td>
                   <td>
-                    <div className="action-group">
+                    <div className="action-group" style={{ justifyContent:'flex-end' }}>
                       <button
                         className="btn btn-sm btn-secondary"
                         onClick={() => startEditAsset(a)}
-                        title="Edit Asset Details"
+                        title="Edit asset details"
+                        id={`edit-asset-${a.id}`}
                       >
-                        <Edit3 size={13} /> Edit
+                        <Edit3 size={12} /> Edit
                       </button>
                       {onDeleteAsset && (
                         <button
                           className="btn btn-sm btn-danger"
-                          onClick={() => handleDelete(a.id)}
-                          title="Delete Asset"
+                          onClick={() => handleDelete(a.id, a.name)}
+                          title="Delete asset"
+                          id={`delete-asset-${a.id}`}
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={12} />
                         </button>
                       )}
                     </div>
@@ -217,40 +206,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       </div>
 
-      <hr className="divider" />
-
-      {/* Pending Queue */}
-      <div style={{ marginBottom:32 }}>
-        <div className="section-heading">
-          <div className="section-title">
-            <ClipboardList size={18} color="var(--blue)" />
+      {/* ── Section 2: Pending Approval Queue ─────────────────── */}
+      <div className="admin-section">
+        <div className="admin-section-header">
+          <div className="admin-section-title">
+            <ClipboardList size={16} color="var(--amber)" />
             Pending Approval Queue
             {pendingReservations.length > 0 && (
-              <span className="tab-badge" style={{ background:'rgba(245,158,11,0.8)' }}>
-                {pendingReservations.length}
-              </span>
+              <span className="admin-section-badge">{pendingReservations.length} awaiting</span>
             )}
           </div>
         </div>
 
         {pendingReservations.length === 0 ? (
-          <div className="glass-panel">
-            <div className="empty-state" style={{ padding:'32px 20px' }}>
-              <CheckCircle2 size={32} color="#34d399" />
-              <h3>All clear — no pending approvals</h3>
-              <p>Standard user reservations will appear here for review.</p>
-            </div>
+          <div className="empty-state" style={{ padding:'38px 20px' }}>
+            <CheckCircle2 size={30} color="#34d399" />
+            <h3>All clear — no pending requests</h3>
+            <p>Standard user reservations will appear here for review.</p>
           </div>
         ) : (
-          <div className="glass-panel table-wrapper">
+          <div className="table-wrapper">
             <table className="data-table">
               <thead>
                 <tr>
                   <th>Requested By</th>
-                  <th>Asset</th>
-                  <th>Dates</th>
-                  <th>Purpose</th>
-                  <th>Actions</th>
+                  <th>Equipment</th>
+                  <th>Date Range</th>
+                  <th>Notes / Purpose</th>
+                  <th style={{ textAlign:'right' }}>Approve / Reject</th>
                 </tr>
               </thead>
               <tbody>
@@ -258,34 +241,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <tr key={r.id}>
                     <td>
                       <div className="td-primary">{r.user_name}</div>
-                      <div className="td-mono">{r.user_role}</div>
+                      <span className={`role-badge role-${r.user_role}`} style={{ marginTop:4, display:'inline-block' }}>{r.user_role}</span>
                     </td>
-                    <td>{r.asset_name}</td>
+                    <td style={{ fontWeight:600, color:'var(--text-1)' }}>{r.asset_name}</td>
                     <td>
-                      <div style={{ fontSize:'0.83rem', color:'var(--text-2)' }}>
+                      <span style={{ fontFamily:'var(--mono)', fontSize:'0.78rem', color:'var(--sky)' }}>
                         {r.start_date} → {r.end_date}
-                      </div>
+                      </span>
                     </td>
                     <td>
-                      <div style={{ fontSize:'0.82rem', color:'var(--text-3)', maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                        {r.notes || <em>No notes provided</em>}
-                      </div>
+                      <span style={{ fontSize:'0.8rem', color:'var(--text-3)' }}>
+                        {r.notes || <em>No notes</em>}
+                      </span>
                     </td>
                     <td>
-                      <div className="action-group">
+                      <div className="action-group" style={{ justifyContent:'flex-end' }}>
                         <button
                           className="btn btn-sm btn-success"
                           onClick={() => onApprove(r.id)}
                           id={`admin-approve-${r.id}`}
                         >
-                          <CheckCircle2 size={13} /> Approve
+                          <CheckCircle2 size={12} /> Approve
                         </button>
                         <button
                           className="btn btn-sm btn-danger"
                           onClick={() => onReject(r.id)}
                           id={`admin-reject-${r.id}`}
                         >
-                          <X size={13} /> Reject
+                          <X size={12} /> Reject
                         </button>
                       </div>
                     </td>
@@ -297,37 +280,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         )}
       </div>
 
-      <hr className="divider" />
-
-      {/* Blackouts */}
-      <div>
-        <div className="section-heading">
-          <div className="section-title">
-            <AlertOctagon size={18} color="var(--amber)" />
+      {/* ── Section 3: Maintenance Blackouts ──────────────────── */}
+      <div className="admin-section">
+        <div className="admin-section-header">
+          <div className="admin-section-title">
+            <CalendarOff size={16} color="var(--amber)" />
             Maintenance Blackout Windows
+            {blackouts.length > 0 && (
+              <span className="admin-section-badge">{blackouts.length} active</span>
+            )}
           </div>
+          <button className="btn btn-sm btn-amber" onClick={() => setShowBlackoutModal(true)}>
+            <AlertOctagon size={13} /> Declare Blackout
+          </button>
         </div>
-        <div className="glass-panel table-wrapper">
+        <div className="table-wrapper">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Asset</th>
+                <th>Equipment</th>
                 <th>Blackout Window</th>
                 <th>Reason</th>
               </tr>
             </thead>
             <tbody>
               {blackouts.length === 0 ? (
-                <tr><td colSpan={3} style={{ textAlign:'center', color:'var(--text-4)', padding:'28px' }}>No blackouts declared.</td></tr>
+                <tr><td colSpan={3} style={{ textAlign:'center', color:'var(--text-4)', padding:'28px' }}>No blackouts declared yet.</td></tr>
               ) : blackouts.map(b => (
                 <tr key={b.id}>
                   <td className="td-primary">{b.asset_name}</td>
                   <td>
-                    <span style={{ fontFamily:'var(--mono)', fontSize:'0.8rem', color:'var(--amber)' }}>
+                    <span style={{ fontFamily:'var(--mono)', fontSize:'0.78rem', color:'var(--amber)' }}>
                       {b.start_date} → {b.end_date}
                     </span>
                   </td>
-                  <td>{b.reason}</td>
+                  <td style={{ color:'var(--text-2)', fontSize:'0.845rem' }}>{b.reason}</td>
                 </tr>
               ))}
             </tbody>
@@ -335,33 +322,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       </div>
 
-      {/* ── Add Asset Modal ── */}
+      {/* ══ Add Asset Modal ═══════════════════════════════════════ */}
       {showAssetModal && (
-        <div className="modal-overlay" onClick={e => { if (e.target===e.currentTarget) setShowAssetModal(false); }}>
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowAssetModal(false); }}>
           <div className="modal-box">
             <div className="modal-header">
               <div>
-                <div className="modal-title">Add New Asset</div>
-                <div className="modal-subtitle">Register equipment in the inventory</div>
+                <div className="modal-title">Add New Equipment</div>
+                <div className="modal-subtitle">Register a new asset in the inventory database</div>
               </div>
-              <button className="btn-close-modal" onClick={() => setShowAssetModal(false)}><X size={20} /></button>
+              <button className="btn-close-modal" onClick={() => setShowAssetModal(false)}><X size={18} /></button>
             </div>
             <form onSubmit={handleAssetSubmit}>
               <div className="modal-body">
                 {assetError && (
-                  <div className="alert alert-error"><AlertTriangle size={16} className="alert-icon" />{assetError}</div>
+                  <div className="alert alert-error"><AlertTriangle size={15} className="alert-icon" />{assetError}</div>
                 )}
                 <div className="form-group">
-                  <label className="form-label">Asset Name</label>
+                  <label className="form-label">Equipment Name</label>
                   <input className="form-control" required placeholder="e.g. Dell XPS 15 Workstation" value={assetName} onChange={e => setAssetName(e.target.value)} />
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                   <div className="form-group">
                     <label className="form-label">Category</label>
                     <select className="form-control" value={category} onChange={e => setCategory(e.target.value)}>
-                      {['Laptop','AV Equipment','Testing Device','Drone','Peripherals','Server','Camera','Other'].map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
+                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                   <div className="form-group">
@@ -369,9 +354,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <input className="form-control" required placeholder="SN-XXXXXX" value={serial} onChange={e => setSerial(e.target.value)} />
                   </div>
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                   <div className="form-group">
-                    <label className="form-label">Late Penalty Rate ($/day)</label>
+                    <label className="form-label">Late Penalty ($/day)</label>
                     <input type="number" min={1} className="form-control" required value={rate} onChange={e => setRate(Number(e.target.value))} />
                   </div>
                   <div className="form-group">
@@ -381,63 +366,61 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
                 <div className="form-group">
                   <label className="form-label">Description</label>
-                  <textarea className="form-control" rows={2} placeholder="Brief description of the asset capabilities..." value={desc} onChange={e => setDesc(e.target.value)} />
+                  <textarea className="form-control" rows={2} placeholder="Brief description of equipment capabilities..." value={desc} onChange={e => setDesc(e.target.value)} />
                 </div>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAssetModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary"><PlusCircle size={14} /> Create Asset</button>
+                <button type="submit" className="btn btn-primary"><PlusCircle size={13} /> Create Asset</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* ── Edit Asset Modal ── */}
+      {/* ══ Edit Asset Modal ═══════════════════════════════════════ */}
       {editingAsset && (
-        <div className="modal-overlay" onClick={e => { if (e.target===e.currentTarget) setEditingAsset(null); }}>
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setEditingAsset(null); }}>
           <div className="modal-box">
             <div className="modal-header">
               <div>
-                <div className="modal-title">Edit Asset Details</div>
-                <div className="modal-subtitle">Update product parameters in MongoDB</div>
+                <div className="modal-title">Edit Equipment Details</div>
+                <div className="modal-subtitle">Editing: <strong style={{ color:'var(--text-1)' }}>{editingAsset.name}</strong></div>
               </div>
-              <button className="btn-close-modal" onClick={() => setEditingAsset(null)}><X size={20} /></button>
+              <button className="btn-close-modal" onClick={() => setEditingAsset(null)}><X size={18} /></button>
             </div>
             <form onSubmit={handleEditSubmit}>
               <div className="modal-body">
                 {editError && (
-                  <div className="alert alert-error"><AlertTriangle size={16} className="alert-icon" />{editError}</div>
+                  <div className="alert alert-error"><AlertTriangle size={15} className="alert-icon" />{editError}</div>
                 )}
                 <div className="form-group">
-                  <label className="form-label">Asset Name</label>
+                  <label className="form-label">Equipment Name</label>
                   <input className="form-control" required value={editName} onChange={e => setEditName(e.target.value)} />
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
                   <div className="form-group">
                     <label className="form-label">Category</label>
                     <select className="form-control" value={editCategory} onChange={e => setEditCategory(e.target.value)}>
-                      {['Laptop','AV Equipment','Testing Device','Drone','Peripherals','Server','Camera','Other'].map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
+                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                   <div className="form-group">
                     <label className="form-label">Status</label>
                     <select className="form-control" value={editStatus} onChange={e => setEditStatus(e.target.value as any)}>
-                      <option value="AVAILABLE">AVAILABLE 🟢</option>
-                      <option value="MAINTENANCE">MAINTENANCE 🟡</option>
-                      <option value="RETIRED">RETIRED 🔴</option>
+                      <option value="AVAILABLE">AVAILABLE</option>
+                      <option value="MAINTENANCE">MAINTENANCE</option>
+                      <option value="RETIRED">RETIRED</option>
                     </select>
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Serial Number</label>
+                    <label className="form-label">Serial #</label>
                     <input className="form-control" required value={editSerial} onChange={e => setEditSerial(e.target.value)} />
                   </div>
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                   <div className="form-group">
-                    <label className="form-label">Late Penalty Rate ($/day)</label>
+                    <label className="form-label">Penalty Rate ($/day)</label>
                     <input type="number" min={1} className="form-control" required value={editRate} onChange={e => setEditRate(Number(e.target.value))} />
                   </div>
                   <div className="form-group">
@@ -452,39 +435,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setEditingAsset(null)}>Cancel</button>
-                <button type="submit" className="btn btn-primary"><Edit3 size={14} /> Save Asset Changes</button>
+                <button type="submit" className="btn btn-primary"><Settings size={13} /> Save Changes</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* ── Blackout Modal ── */}
+      {/* ══ Blackout Modal ════════════════════════════════════════ */}
       {showBlackoutModal && (
-        <div className="modal-overlay" onClick={e => { if (e.target===e.currentTarget) setShowBlackoutModal(false); }}>
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowBlackoutModal(false); }}>
           <div className="modal-box">
             <div className="modal-header">
               <div>
                 <div className="modal-title">Declare Maintenance Blackout</div>
-                <div className="modal-subtitle">Block an asset for a maintenance window</div>
+                <div className="modal-subtitle">Block an asset from new bookings during a maintenance window</div>
               </div>
-              <button className="btn-close-modal" onClick={() => setShowBlackoutModal(false)}><X size={20} /></button>
+              <button className="btn-close-modal" onClick={() => setShowBlackoutModal(false)}><X size={18} /></button>
             </div>
             <form onSubmit={handleBlackoutSubmit}>
               <div className="modal-body">
                 <div className="alert alert-warning">
-                  <Info size={16} className="alert-icon" />
-                  <div>All existing reservations overlapping with this blackout window will be blocked from new bookings.</div>
+                  <Info size={14} className="alert-icon" />
+                  <div>Any new reservation attempts overlapping this window will be automatically blocked for this asset.</div>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Select Asset</label>
+                  <label className="form-label">Select Equipment</label>
                   <select className="form-control" value={boAssetId} onChange={e => setBoAssetId(e.target.value)}>
                     {assets.map(a => (
-                      <option key={a.id} value={a.id}>{a.name} ({a.serial_number})</option>
+                      <option key={a.id} value={a.id}>{a.name} — {a.serial_number}</option>
                     ))}
                   </select>
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                   <div className="form-group">
                     <label className="form-label">Start Date</label>
                     <input type="date" className="form-control" required value={boStart} onChange={e => setBoStart(e.target.value)} />
@@ -501,7 +484,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowBlackoutModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-amber"><AlertOctagon size={14} /> Declare Blackout</button>
+                <button type="submit" className="btn btn-amber"><AlertOctagon size={13} /> Declare Blackout</button>
               </div>
             </form>
           </div>
