@@ -1,15 +1,16 @@
 import React from 'react';
-import { Laptop, Circle } from 'lucide-react';
+import { Laptop, LogOut } from 'lucide-react';
 import { User } from '../types.js';
 
 interface NavbarProps {
   currentUser: User;
   allUsers: User[];
   onSwitchUser: (userId: number) => void;
+  onLogout: () => void;
   stats: { total: number; available: number; pending: number; myReservations: number };
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentUser, allUsers, onSwitchUser, stats }) => {
+export const Navbar: React.FC<NavbarProps> = ({ currentUser, allUsers, onSwitchUser, onLogout, stats }) => {
   return (
     <header className="navbar">
       <div className="brand">
@@ -56,6 +57,18 @@ export const Navbar: React.FC<NavbarProps> = ({ currentUser, allUsers, onSwitchU
           </select>
           <span className={`role-badge role-${currentUser.role}`}>{currentUser.role}</span>
         </div>
+
+        {/* Logout Button */}
+        <button
+          className="btn btn-sm btn-secondary"
+          onClick={onLogout}
+          id="logout-btn"
+          title="Sign out of EquipFlow"
+          style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          <LogOut size={14} />
+          <span>Logout</span>
+        </button>
       </div>
     </header>
   );

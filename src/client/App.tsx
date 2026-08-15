@@ -280,6 +280,14 @@ export function App() {
     } catch { return { success: false, error: 'Network error' }; }
   };
 
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setToken('');
+    setReservations([]);
+    setBlackouts([]);
+    setTab('CATALOG');
+  };
+
   /* ── Loading / Login state ── */
   if (!appReady) {
     return (
@@ -304,6 +312,7 @@ export function App() {
         currentUser={currentUser}
         allUsers={users}
         onSwitchUser={handleSwitchUser}
+        onLogout={handleLogout}
         stats={{
           total: assets.length,
           available: availableCount,
