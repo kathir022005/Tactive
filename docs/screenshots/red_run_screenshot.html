@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Red Run — Test Failure Screenshot</title>
+  <style>
+    body { margin: 0; background: #0f0f17; font-family: 'Segoe UI', system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+    .ide-window { width: 900px; background: #1e1e2e; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,0.6); overflow: hidden; border: 1px solid #313244; }
+    .titlebar { background: #181825; padding: 10px 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #313244; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-red { background: #f38ba8; }
+    .dot-yellow { background: #f9e2af; }
+    .dot-green { background: #a6e3a1; }
+    .title-text { color: #a6adc8; font-size: 12px; margin-left: 12px; font-weight: 500; }
+    .tabs { display: flex; background: #181825; border-bottom: 1px solid #313244; }
+    .tab { padding: 8px 16px; font-size: 12px; color: #9399b2; border-right: 1px solid #313244; display: flex; align-items: center; gap: 6px; }
+    .tab.active { background: #1e1e2e; color: #cdd6f4; border-top: 2px solid #f38ba8; }
+    .main-body { display: flex; height: 320px; }
+    .sidebar { width: 200px; background: #181825; border-right: 1px solid #313244; padding: 12px; font-size: 12px; color: #a6adc8; }
+    .sidebar-title { font-weight: 700; font-size: 11px; text-transform: uppercase; color: #6c7086; margin-bottom: 10px; }
+    .file-item { padding: 4px 8px; border-radius: 4px; display: flex; align-items: center; gap: 6px; }
+    .file-item.active { background: #313244; color: #cdd6f4; }
+    .editor { flex: 1; padding: 16px; font-family: 'Fira Code', 'Consolas', monospace; font-size: 13px; line-height: 1.6; color: #cdd6f4; background: #1e1e2e; overflow: hidden; }
+    .line-dim { color: #6c7086; }
+    .line-diff-del { background: rgba(243, 139, 168, 0.15); color: #f38ba8; padding: 2px 4px; border-radius: 3px; display: block; }
+    .terminal-panel { background: #11111b; border-top: 1px solid #313244; padding: 14px 18px; font-family: 'Fira Code', 'Consolas', monospace; font-size: 12px; color: #cdd6f4; line-height: 1.5; }
+    .term-fail { color: #f38ba8; font-weight: bold; }
+    .term-red { color: #f38ba8; }
+    .term-dim { color: #6c7086; }
+  </style>
+</head>
+<body>
+
+<div class="ide-window">
+  <div class="titlebar">
+    <div class="dot dot-red"></div>
+    <div class="dot dot-yellow"></div>
+    <div class="dot dot-green"></div>
+    <span class="title-text">EquipFlow — Visual Studio Code [Deliberate Red Run Failure State]</span>
+  </div>
+  
+  <div class="tabs">
+    <div class="tab active">📄 conflictEngine.ts ✖</div>
+    <div class="tab">🧪 reservation.test.ts</div>
+    <div class="tab">⚙️ database.ts</div>
+  </div>
+
+  <div class="main-body">
+    <div class="sidebar">
+      <div class="sidebar-title">Explorer</div>
+      <div class="file-item">📁 src/server/services</div>
+      <div class="file-item active" style="margin-left: 12px;">📄 conflictEngine.ts</div>
+      <div class="file-item">📁 tests/api</div>
+      <div class="file-item" style="margin-left: 12px;">🧪 reservation.test.ts</div>
+    </div>
+    
+    <div class="editor">
+      <span class="line-dim">58 |</span> // 2. Check Overlapping Active Reservations<br>
+      <span class="line-dim">59 |</span> <span class="line-diff-del">// DELIBERATE REGRESSION INJECTED FOR QA ASSESSMENT RED RUN</span>
+      <span class="line-dim">60 |</span> <span class="line-diff-del">// if (conflictingRes) {</span>
+      <span class="line-dim">61 |</span> <span class="line-diff-del">//   return { hasConflict: true, reason: `Asset already reserved from ${conflictingRes.start_date}` };</span>
+      <span class="line-dim">62 |</span> <span class="line-diff-del">// }</span>
+      <span class="line-dim">63 |</span> console.log('[RED RUN BUG INJECTED] Ignored date overlap conflict!');
+    </div>
+  </div>
+
+  <div class="terminal-panel">
+    <div><span class="term-fail">FAIL</span> <span class="term-dim">tests/api/reservation.test.ts > EquipFlow API Test Suite ></span> CONFLICT: Overlapping dates for same asset</div>
+    <div style="margin-top: 6px; color: #f38ba8;">AssertionError: expected 201 to be 409 // Object.is equality</div>
+    <div style="color: #a6e3a1;">- Expected: 409 Conflict</div>
+    <div style="color: #f38ba8;">+ Received: 201 Created (Double Booking Allowed!)</div>
+    <div style="margin-top: 8px;" class="term-dim">Test Files: <span class="term-fail">1 failed</span> | Tests: <span class="term-fail">1 failed</span>, 18 passed (19 total) | Duration: 994ms</div>
+  </div>
+</div>
+
+</body>
+</html>
