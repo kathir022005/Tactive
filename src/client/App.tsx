@@ -7,9 +7,14 @@ import { AdminPanel } from './components/AdminPanel.js';
 import { Login } from './components/Login.js';
 import { Register } from './components/Register.js';
 import { User, Asset, Reservation, Blackout } from './types.js';
-import { LayoutGrid, CalendarCheck, ShieldCheck, Package, Zap, Users } from 'lucide-react';
+import {
+  LayoutGrid, CalendarCheck, ShieldCheck, Package, Zap, Users,
+  PlusCircle, Edit3, X, AlertTriangle, Settings
+} from 'lucide-react';
 import './styles/index.css';
 import './styles/login.css';
+
+const CATEGORIES = ['Laptop', 'AV Equipment', 'Testing Device', 'Drone', 'Peripherals', 'Server', 'Camera', 'Other'];
 
 export function App() {
   const [users, setUsers]               = useState<User[]>([]);
@@ -22,6 +27,29 @@ export function App() {
   const [bookingAsset, setBookingAsset] = useState<Asset | null>(null);
   const [appReady, setAppReady]         = useState(true);
   const [showRegister, setShowRegister] = useState(false);
+
+  // Global Add & Edit Asset Modals
+  const [showAddAssetModal, setShowAddAssetModal] = useState(false);
+  const [editingAsset, setEditingAsset]           = useState<Asset | null>(null);
+
+  // Add Asset form state
+  const [newName, setNewName]         = useState('');
+  const [newCat, setNewCat]           = useState('Laptop');
+  const [newSerial, setNewSerial]     = useState('');
+  const [newRate, setNewRate]         = useState(50);
+  const [newLoc, setNewLoc]           = useState('Main Office - Locker A');
+  const [newDesc, setNewDesc]         = useState('');
+  const [addError, setAddError]       = useState('');
+
+  // Edit Asset form state
+  const [editName, setEditName]       = useState('');
+  const [editCat, setEditCat]         = useState('');
+  const [editSerial, setEditSerial]   = useState('');
+  const [editStatus, setEditStatus]   = useState<'AVAILABLE' | 'MAINTENANCE' | 'RETIRED'>('AVAILABLE');
+  const [editRate, setEditRate]       = useState(50);
+  const [editLoc, setEditLoc]         = useState('');
+  const [editDesc, setEditDesc]       = useState('');
+  const [editError, setEditError]     = useState('');
 
   /* ── Bootstrap ── */
   useEffect(() => {
@@ -37,14 +65,13 @@ export function App() {
   }, []);
 
   const loginAs = async (username: string, pwd?: string) => {
-    // If pwd is not provided, look it up based on standard test accounts for the user switcher
     if (!pwd) {
       const u = users.find(x => x.username === username);
       pwd = u?.role === 'ADMIN' ? 'admin123' : 'user123';
     }
     
     try {
-      const res  = await fetch('/api/auth/login', {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password: pwd })
@@ -54,7 +81,12 @@ export function App() {
         setToken(data.token);
         setCurrentUser(data.user);
         fetchReservations(data.token);
-        if (data.user.role === 'ADMIN') fetchBlackouts(data.token);
+        if (data.user.role === 'ADMIN') {
+          fetchBlackouts(data.token);
+          setTab('ADMIN'); // Auto-navigate admin directly to Admin Panel!
+        } else {
+          setTab('CATALOG');
+        }
         return { success: true };
       } else {
         return { success: false, error: data.error };
@@ -88,11 +120,15 @@ export function App() {
 
   const handleSwitchUser = (userId: number) => {
     const u = users.find(x => x.id === userId);
-    if (u) { setReservations([]); loginAs(u.username); setTab('CATALOG'); }
+    if (u) {
+      setReservations([]);
+      loginAs(u.username);
+      setTab(u.role === 'ADMIN' ? 'ADMIN' : 'CATALOG');
+    }
   };
 
   /* ── API Actions ── */
-  const handleBooking = async (assetId: number, startDate: string, endDate: string, notes: string) => {
+  const handleBooking = async (assetId: number | string, startDate: string, endDate: string, notes: string) => {
     const res = await fetch('/api/reservations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -103,7 +139,7 @@ export function App() {
     return { success: false, error: data.reason || data.error };
   };
 
-  const handleReturn = async (id: number, returnDate?: string) => {
+  const handleReturn = async (id: number | string, returnDate?: string) => {
     const res = await fetch(`/api/reservations/${id}/return`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -114,7 +150,7 @@ export function App() {
     return { success: false, message: data.error };
   };
 
-  const handleCancel = async (id: number) => {
+  const handleCancel = async (id: number | string) => {
     const res = await fetch(`/api/reservations/${id}/cancel`, {
       method: 'POST', headers: { Authorization: `Bearer ${token}` }
     });
@@ -123,12 +159,12 @@ export function App() {
     return { success: false, message: data.error };
   };
 
-  const handleApprove = async (id: number) => {
+  const handleApprove = async (id: number | string) => {
     await fetch(`/api/reservations/${id}/approve`, { method:'POST', headers:{ Authorization:`Bearer ${token}` } });
     fetchReservations();
   };
 
-  const handleReject = async (id: number) => {
+  const handleReject = async (id: number | string) => {
     await fetch(`/api/reservations/${id}/reject`, { method:'POST', headers:{ Authorization:`Bearer ${token}` } });
     fetchReservations();
   };
@@ -170,6 +206,59 @@ export function App() {
     });
     if (res.ok) { fetchBlackouts(); fetchAssets(); return true; }
     return false;
+  };
+
+  const openEditModal = (asset: Asset) => {
+    setEditingAsset(asset);
+    setEditName(asset.name);
+    setEditCat(asset.category);
+    setEditSerial(asset.serial_number);
+    setEditStatus(asset.status);
+    setEditRate(asset.daily_penalty_rate);
+    setEditLoc(asset.location || 'Main Office');
+    setEditDesc(asset.description || '');
+    setEditError('');
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAsset) return;
+    setEditError('');
+    const ok = await handleUpdateAsset(editingAsset.id, {
+      name: editName,
+      category: editCat,
+      serialNumber: editSerial,
+      status: editStatus,
+      dailyPenaltyRate: editRate,
+      location: editLoc,
+      description: editDesc,
+    });
+    if (ok) {
+      setEditingAsset(null);
+    } else {
+      setEditError('Failed to update asset. Check inputs or serial number uniqueness.');
+    }
+  };
+
+  const handleSaveAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddError('');
+    const ok = await handleCreateAsset({
+      name: newName,
+      category: newCat,
+      serialNumber: newSerial,
+      dailyPenaltyRate: newRate,
+      location: newLoc,
+      description: newDesc,
+    });
+    if (ok) {
+      setShowAddAssetModal(false);
+      setNewName('');
+      setNewSerial('');
+      setNewDesc('');
+    } else {
+      setAddError('Failed to create asset. Serial number may already exist.');
+    }
   };
 
   const handleRegister = async (data: { username: string; name: string; department: string; password: string }) => {
@@ -229,7 +318,7 @@ export function App() {
           <div className="role-banner role-banner-admin">
             <div className="role-banner-icon role-banner-icon-admin"><ShieldCheck size={16} /></div>
             <div>
-              <strong>Admin Panel Active</strong> — You can manage inventory, add/edit/delete equipment, approve or reject pending reservations, and declare maintenance blackouts. Switch to another user to test standard flows.
+              <strong>Admin Panel Active</strong> — You have full management rights to Add, Edit, and Delete equipment, review pending bookings, and declare maintenance blackouts.
             </div>
           </div>
         )}
@@ -306,7 +395,13 @@ export function App() {
 
         {/* Views */}
         {tab === 'CATALOG' && (
-          <AssetCatalog assets={assets} currentUser={currentUser} onSelectReserve={setBookingAsset} />
+          <AssetCatalog
+            assets={assets}
+            currentUser={currentUser}
+            onSelectReserve={setBookingAsset}
+            onEditAsset={openEditModal}
+            onAddAsset={() => setShowAddAssetModal(true)}
+          />
         )}
         {tab === 'MY_RESERVATIONS' && (
           <MyReservations
@@ -339,6 +434,126 @@ export function App() {
           onClose={() => setBookingAsset(null)}
           onSubmit={handleBooking}
         />
+      )}
+
+      {/* Global Add Asset Modal */}
+      {showAddAssetModal && (
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowAddAssetModal(false); }}>
+          <div className="modal-box">
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">Add New Equipment</div>
+                <div className="modal-subtitle">Register new equipment in the inventory database</div>
+              </div>
+              <button className="btn-close-modal" onClick={() => setShowAddAssetModal(false)}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleSaveAdd}>
+              <div className="modal-body">
+                {addError && (
+                  <div className="alert alert-error"><AlertTriangle size={15} className="alert-icon" />{addError}</div>
+                )}
+                <div className="form-group">
+                  <label className="form-label">Equipment Name</label>
+                  <input className="form-control" required placeholder="e.g. Dell XPS 15 Workstation" value={newName} onChange={e => setNewName(e.target.value)} />
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Category</label>
+                    <select className="form-control" value={newCat} onChange={e => setNewCat(e.target.value)}>
+                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Serial Number</label>
+                    <input className="form-control" required placeholder="SN-XXXXXX" value={newSerial} onChange={e => setNewSerial(e.target.value)} />
+                  </div>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Late Penalty ($/day)</label>
+                    <input type="number" min={1} className="form-control" required value={newRate} onChange={e => setNewRate(Number(e.target.value))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Location</label>
+                    <input className="form-control" value={newLoc} onChange={e => setNewLoc(e.target.value)} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Description</label>
+                  <textarea className="form-control" rows={2} placeholder="Brief description of equipment capabilities..." value={newDesc} onChange={e => setNewDesc(e.target.value)} />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAddAssetModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary"><PlusCircle size={13} /> Create Equipment</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Global Edit Asset Modal */}
+      {editingAsset && (
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setEditingAsset(null); }}>
+          <div className="modal-box">
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">Edit Equipment Details</div>
+                <div className="modal-subtitle">Editing: <strong style={{ color:'var(--text-1)' }}>{editingAsset.name}</strong></div>
+              </div>
+              <button className="btn-close-modal" onClick={() => setEditingAsset(null)}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleSaveEdit}>
+              <div className="modal-body">
+                {editError && (
+                  <div className="alert alert-error"><AlertTriangle size={15} className="alert-icon" />{editError}</div>
+                )}
+                <div className="form-group">
+                  <label className="form-label">Equipment Name</label>
+                  <input className="form-control" required value={editName} onChange={e => setEditName(e.target.value)} />
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+                  <div className="form-group">
+                    <label className="form-label">Category</label>
+                    <select className="form-control" value={editCat} onChange={e => setEditCat(e.target.value)}>
+                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Status</label>
+                    <select className="form-control" value={editStatus} onChange={e => setEditStatus(e.target.value as any)}>
+                      <option value="AVAILABLE">AVAILABLE</option>
+                      <option value="MAINTENANCE">MAINTENANCE</option>
+                      <option value="RETIRED">RETIRED</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Serial #</label>
+                    <input className="form-control" required value={editSerial} onChange={e => setEditSerial(e.target.value)} />
+                  </div>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Penalty Rate ($/day)</label>
+                    <input type="number" min={1} className="form-control" required value={editRate} onChange={e => setEditRate(Number(e.target.value))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Location</label>
+                    <input className="form-control" value={editLoc} onChange={e => setEditLoc(e.target.value)} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Description</label>
+                  <textarea className="form-control" rows={2} value={editDesc} onChange={e => setEditDesc(e.target.value)} />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setEditingAsset(null)}>Cancel</button>
+                <button type="submit" className="btn btn-primary"><Settings size={13} /> Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </>
   );

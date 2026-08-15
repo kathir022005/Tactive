@@ -1,14 +1,22 @@
 import React, { useState } from 'react';
-import { Search, Calendar, MapPin, Tag, PackageX, SlidersHorizontal, Zap } from 'lucide-react';
+import { Search, Calendar, MapPin, Tag, PackageX, SlidersHorizontal, Zap, Edit3, PlusCircle } from 'lucide-react';
 import { Asset, User } from '../types.js';
 
 interface AssetCatalogProps {
   assets: Asset[];
   currentUser: User;
   onSelectReserve: (asset: Asset) => void;
+  onEditAsset?: (asset: Asset) => void;
+  onAddAsset?: () => void;
 }
 
-export const AssetCatalog: React.FC<AssetCatalogProps> = ({ assets, currentUser, onSelectReserve }) => {
+export const AssetCatalog: React.FC<AssetCatalogProps> = ({
+  assets,
+  currentUser,
+  onSelectReserve,
+  onEditAsset,
+  onAddAsset,
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
@@ -17,7 +25,8 @@ export const AssetCatalog: React.FC<AssetCatalogProps> = ({ assets, currentUser,
 
   const filtered = assets.filter(a => {
     const q = searchTerm.toLowerCase();
-    const matchSearch = !q ||
+    const matchSearch =
+      !q ||
       a.name.toLowerCase().includes(q) ||
       a.serial_number.toLowerCase().includes(q) ||
       (a.description || '').toLowerCase().includes(q) ||
@@ -39,7 +48,16 @@ export const AssetCatalog: React.FC<AssetCatalogProps> = ({ assets, currentUser,
             {availableCount} of {assets.length} assets available for reservation
           </p>
         </div>
-        <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {currentUser.role === 'ADMIN' && onAddAsset && (
+            <button
+              className="btn btn-sm btn-primary"
+              onClick={onAddAsset}
+              id="catalog-add-asset-btn"
+            >
+              <PlusCircle size={14} /> Add Equipment
+            </button>
+          )}
           <button
             className={`btn btn-sm ${showAvailableOnly ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setShowAvailableOnly(!showAvailableOnly)}
@@ -89,7 +107,7 @@ export const AssetCatalog: React.FC<AssetCatalogProps> = ({ assets, currentUser,
       ) : (
         <div className="grid-assets">
           {filtered.map(asset => (
-            <div key={asset.id} className="glass-card" style={{ display:'flex', flexDirection:'column' }}>
+            <div key={asset.id} className="glass-card" style={{ display: 'flex', flexDirection: 'column' }}>
               <div className="asset-card-top">
                 <span className="cat-tag">
                   <Tag size={11} />
@@ -107,8 +125,10 @@ export const AssetCatalog: React.FC<AssetCatalogProps> = ({ assets, currentUser,
                   <span className="asset-serial">{asset.serial_number}</span>
                 </div>
                 <div className="asset-meta-row">
-                  <span><MapPin size={12} style={{ verticalAlign:'middle', marginRight:2 }} />Location</span>
-                  <span style={{ color:'var(--text-2)', fontSize:'0.8rem' }}>{asset.location}</span>
+                  <span>
+                    <MapPin size={12} style={{ verticalAlign: 'middle', marginRight: 2 }} /> Location
+                  </span>
+                  <span style={{ color: 'var(--text-2)', fontSize: '0.8rem' }}>{asset.location}</span>
                 </div>
                 <div className="asset-meta-row">
                   <span>Late Penalty</span>
@@ -120,27 +140,58 @@ export const AssetCatalog: React.FC<AssetCatalogProps> = ({ assets, currentUser,
               <div className="availability-bar">
                 <div
                   className={`availability-fill-${asset.status === 'AVAILABLE' ? 'good' : 'busy'}`}
-                  style={{ height:'100%', width: asset.status === 'AVAILABLE' ? '100%' : '30%', borderRadius:2 }}
+                  style={{ height: '100%', width: asset.status === 'AVAILABLE' ? '100%' : '30%', borderRadius: 2 }}
                 />
               </div>
 
-              <div style={{ marginTop:16 }}>
-                <button
-                  className={`btn btn-full ${asset.status === 'AVAILABLE' ? 'btn-primary' : 'btn-secondary'}`}
-                  disabled={asset.status !== 'AVAILABLE'}
-                  onClick={() => onSelectReserve(asset)}
-                  id={`reserve-btn-${asset.id}`}
-                >
-                  <Calendar size={15} />
-                  {asset.status === 'AVAILABLE' ? 'Reserve Equipment' : `Unavailable — ${asset.status}`}
-                </button>
-
-                {currentUser.role === 'VIP' && asset.status === 'AVAILABLE' && (
-                  <div style={{ textAlign:'center', marginTop:'8px' }}>
-                    <span style={{ fontSize:'0.72rem', color:'#a78bfa', display:'flex', alignItems:'center', justifyContent:'center', gap:4 }}>
-                      <Zap size={11} /> VIP Priority — Instant Confirmation
-                    </span>
+              <div style={{ marginTop: 16 }}>
+                {currentUser.role === 'ADMIN' ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => onEditAsset && onEditAsset(asset)}
+                      id={`catalog-edit-asset-${asset.id}`}
+                    >
+                      <Edit3 size={13} /> Edit Asset
+                    </button>
+                    <button
+                      className={`btn btn-sm ${asset.status === 'AVAILABLE' ? 'btn-primary' : 'btn-secondary'}`}
+                      disabled={asset.status !== 'AVAILABLE'}
+                      onClick={() => onSelectReserve(asset)}
+                      id={`reserve-btn-${asset.id}`}
+                    >
+                      <Calendar size={13} /> Reserve
+                    </button>
                   </div>
+                ) : (
+                  <>
+                    <button
+                      className={`btn btn-full ${asset.status === 'AVAILABLE' ? 'btn-primary' : 'btn-secondary'}`}
+                      disabled={asset.status !== 'AVAILABLE'}
+                      onClick={() => onSelectReserve(asset)}
+                      id={`reserve-btn-${asset.id}`}
+                    >
+                      <Calendar size={15} />
+                      {asset.status === 'AVAILABLE' ? 'Reserve Equipment' : `Unavailable — ${asset.status}`}
+                    </button>
+
+                    {currentUser.role === 'VIP' && asset.status === 'AVAILABLE' && (
+                      <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            color: '#a78bfa',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          <Zap size={11} /> VIP Priority — Instant Confirmation
+                        </span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>

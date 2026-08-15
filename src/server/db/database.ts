@@ -5,7 +5,9 @@ import { User, Asset } from './models.js';
 // override: false → CI-injected env vars win over local .env file
 dotenv.config({ override: false });
 
-const MONGO_URI = process.env.MONGO_URI || '';
+const MONGO_URI =
+  process.env.MONGO_URI ||
+  'mongodb+srv://kathirashok255:Akkathir2005@cluster0.ly7x9.mongodb.net/equipflow?appName=Cluster0';
 
 export async function connectDB(): Promise<void> {
   if (!MONGO_URI) {
